@@ -513,9 +513,16 @@ function renderNav(){
   document.getElementById('tabbar').innerHTML=items;
   document.getElementById('rail').innerHTML=`<div class="brand">Carnet Sport<small>Entraînement de Nicolas</small></div>`+items;
 }
+/* Séance en cours : brouillon gardé si l'app est fermée en pleine séance */
+const DRAFT='carnet-sport-draft';
+function saveDraft(){if(!ED||!ED.exercises)return;try{localStorage.setItem(DRAFT,JSON.stringify(ED))}catch(e){}}
+function getDraft(){try{const d=JSON.parse(localStorage.getItem(DRAFT)||'null');return d&&d.exercises?d:null}catch(e){return null}}
+function clearDraft(){try{localStorage.removeItem(DRAFT)}catch(e){}}
+function draftBanner(){const d=!ED&&getDraft();if(!d)return '';const all=d.exercises.reduce((a,x)=>a+x.sets.length,0),ok=d.exercises.reduce((a,x)=>a+x.sets.filter(z=>z.ok).length,0);if(!ok)return '';
+  return `<div class="banner"><span><b>Séance en cours :</b> ${esc(d.title)}, ${ok}/${all} séries faites.</span><div class="row"><button class="btn sm primary" data-a="resumeDraft">Reprendre</button><button class="btn sm" data-a="dropDraft">Abandonner</button></div></div>`}
 function render(){renderNav();const m=document.getElementById('main');
   const banner=S.example?`<div class="banner"><span><b>Données d'exemple.</b> Elles montrent l'app en situation et disparaissent dès ta première séance enregistrée.</span><button class="btn sm" data-a="clearEx">Partir de zéro</button></div>`:'';
-  m.innerHTML=banner+({today:vToday,calendar:vCalendar,library:vLibrary,exercises:vExercises,progress:vProgress,settings:vSettings}[UI.view])();figStart()}
+  m.innerHTML=draftBanner()+banner+({today:vToday,calendar:vCalendar,library:vLibrary,exercises:vExercises,progress:vProgress,settings:vSettings}[UI.view])();figStart()}
 
 function typeChip(type){return `<span class="chip t-${type}"><span class="dot"></span>${TYPES[type].label}</span>`}
 function sessItem(s){
@@ -691,7 +698,7 @@ function openStravaPreview(acts){
    <div class="sheet-b">${acts.length?`<p class="small muted" style="margin:0">Coche ce que tu veux importer. Les prochaines activités s'importeront automatiquement à l'ouverture de l'app.</p>
    <div>${acts.map(a=>`<label class="imp"><input type="checkbox" data-imp="${esc(a.id)}" ${known(a.id)?'disabled':'checked'}><span class="dot t-${a.type}"></span><span class="main"><b>${esc(a.name)}</b><br><span class="small muted tn">${fmtShort(a.date)} · ${esc(SPORTS[a.sp].n)}${a.km?' · '+a.km+' km':''}${a.sec?' · '+fmtSec(a.sec):''}${a.km&&a.sec&&a.type==='run'?' · '+fmtPace(a.sec/a.km)+' /km':''}${known(a.id)?' · déjà importée':''}</span></span></label>`).join('')}</div>`:'<div class="empty">Aucune activité trouvée sur les 30 derniers jours.</div>'}</div>
    <div class="sheet-f"><span></span><button class="btn primary" data-a="stravaImport">${acts.length?'Importer la sélection':'Activer la synchro'}</button></div></div>`;
-  ov2.hidden=false;
+  showOv2();
 }
 function maybeAutoStrava(){if(S.profile.strava&&!UI.autoStrava&&!S.example){UI.autoStrava=true;stravaSync(false)}}
 
@@ -1087,7 +1094,7 @@ function vSettings(){
 /* ================= SESSION EDITOR ================= */
 const ov=document.getElementById('ov'),ov2=document.getElementById('ov2');
 function openEditor(s,isNew){ED=clone(s);ED._new=!!isNew;UI.confirmDel=false;ov.innerHTML='';renderSheet();ov.hidden=false;if(ED.exercises&&ED.exercises.length)keepAwake(true)}
-function closeEditor(){ED=null;ov.hidden=true;ov.innerHTML='';stopTimer();keepAwake(false)}
+function closeEditor(keep){if(!keep)clearDraft();ED=null;ov.hidden=true;ov.innerHTML='';stopTimer();keepAwake(false)}
 function renderSheet(){
   if(!ED){return}
   const ob=ov.querySelector('.sheet-b');const keepScroll=ob?ob.scrollTop:0;
@@ -1111,6 +1118,7 @@ function renderSheet(){
    `<div class="row">${s.exercises?`<button class="btn sm" data-a="timer" data-n="${S.profile.rest||90}">Repos ${S.profile.rest||90} s</button>`:''}${!s._new?`<button class="btn ghost sm danger" data-a="delAsk">Supprimer</button>`:''}</div>
    <div class="row"><button class="btn" data-a="saveSess">${s._new?'Planifier':'Enregistrer'}</button><button class="btn primary" data-a="finishSess">${s.status==='done'?'Mettre à jour':'Séance faite'}</button></div>`;
   ov.innerHTML=`<div class="sheet t-${s.type}" role="dialog" aria-modal="true" aria-label="${esc(s.title)}"><div class="sheet-h"><div class="row">${typeChip(s.type)}${s.stravaId?'<span class="strava small">Strava</span>':''}<span class="pill ${s.status==='done'?'ok':'neutral'}">${s.status==='done'?'Faite':'Prévue'}</span></div><button class="x" data-a="close" aria-label="Fermer">×</button></div><div class="sheet-b">${body}</div>${timerBar()}<div class="sheet-f">${foot}</div></div>`;
+  saveDraft();
   const nb=ov.querySelector('.sheet-b');if(nb&&keepScroll)nb.scrollTop=keepScroll;
 }
 const CHECK='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -1161,9 +1169,13 @@ function openPicker(date){
   <div class="sheet-b">${b&&b.deficit>0?`<div class="sugg"><b>Conseillée :</b> ${esc(b.tpl.name)}. ${esc(b.why[0]||'')}</div>`:''}
   ${Object.keys(TYPES).map(k=>`<div class="stack" style="gap:6px"><div class="eyebrow">${TYPES[k].label}</div>${TPL.filter(t=>t.type===k).map(t=>`<button class="sitem t-${t.type}" data-a="pickTpl" data-t="${t.id}" data-d="${date}"><span class="stripe"></span><span class="main"><span class="ttl">${esc(t.name)}${b&&b.tpl.id===t.id&&b.deficit>0?' · conseillée':''}</span><br><span class="meta">${t.dur} min · ${esc(t.desc)}</span></span></button>`).join('')}
   <div class="row">${Object.entries(SPORTS).filter(([,x])=>x.type===k).map(([id,x])=>`<button class="btn sm" data-a="pickFree" data-sport="${id}" data-d="${date}">+ ${esc(x.n)}</button>`).join('')}</div></div>`).join('')}</div></div>`;
-  ov2.hidden=false}
-function closePicker(){ov2.hidden=true;ov2.innerHTML=''}
-function openExInfo(id){ov2.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(EX[id].n)}"><div class="sheet-h"><h3>${esc(EX[id].n)}</h3><button class="x" data-a="closePick" aria-label="Fermer">×</button></div><div class="sheet-b">${exDetail(id)}</div></div>`;ov2.hidden=false;figStart()}
+  showOv2()}
+/* Couche secondaire (fiche mouvement, choix de séance) : bouton retour + geste retour du téléphone */
+function showOv2(){ov2.hidden=false;try{if(!(history.state&&history.state.layer==='ov2'))history.pushState({layer:'ov2'},'')}catch(e){}}
+function closePicker(fromPop){ov2.hidden=true;ov2.innerHTML='';if(!fromPop){try{if(history.state&&history.state.layer==='ov2')history.back()}catch(e){}}}
+window.addEventListener('popstate',()=>{if(!ov2.hidden)closePicker(true)});
+function openExInfo(id){const back=ED?'Retour à la séance':'Fermer';
+  ov2.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(EX[id].n)}"><div class="sheet-h"><button class="btn ghost backb" data-a="closePick">‹ ${ED?'Séance':'Retour'}</button><h3 style="flex:1;min-width:0;text-align:center">${esc(EX[id].n)}</h3><button class="x" data-a="closePick" aria-label="Fermer">×</button></div><div class="sheet-b">${exDetail(id)}</div><div class="sheet-f"><button class="btn primary wide" data-a="closePick">${back}</button></div></div>`;showOv2();figStart()}
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2200)}
 
@@ -1171,7 +1183,9 @@ function toast(t){const el=document.getElementById('toast');el.textContent=t;el.
 const A={
  nav:b=>{UI.view=b.dataset.v;render();window.scrollTo(0,0)},
  open:b=>{const s=S.sessions.find(x=>x.id===b.dataset.id);if(s)openEditor(s,false)},
- close:()=>closeEditor(),
+ close:()=>{const keep=ED&&ED.exercises&&ED.status!=='done'&&ED.exercises.some(x=>x.sets.some(z=>z.ok));closeEditor(keep);if(keep){render();toast('Séance gardée en cours. Reprends-la depuis l\'écran d\'accueil.')}},
+ resumeDraft:()=>{const d=getDraft();if(d)openEditor(d,!!d._new)},
+ dropDraft:()=>{clearDraft();render();toast('Séance en cours abandonnée')},
  pick:b=>openPicker(b.dataset.d),
  closePick:()=>closePicker(),
  pickTpl:b=>{closePicker();openEditor(instantiate(TPLBY[b.dataset.t],b.dataset.d),true)},
@@ -1200,7 +1214,7 @@ const A={
    let v=num(st[f]);
    if(v==null){if(f==='reps')v=x.hi;else{const prev=x.sets.slice(0,si).map(z=>num(z.load)).filter(z=>z!=null).pop();v=prev??0}if(f==='load'&&d<0&&v===0)return}
    else v=f==='reps'?Math.max(0,v+d*(e.unit==='sec'?5:1)):Math.max(0,Math.round((v+d*(e.step||2.5))*100)/100);
-   st[f]=String(v);const inp=document.getElementById(f[0]+'-'+ei+'-'+si);if(inp)inp.value=v;try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}},
+   st[f]=String(v);saveDraft();const inp=document.getElementById(f[0]+'-'+ei+'-'+si);if(inp)inp.value=v;try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}},
  okSet:b=>{const ei=+b.dataset.ei,si=+b.dataset.si;const x=ED.exercises[ei],st=x.sets[si];
    if(st.ok){st.ok=false;renderSheet();return}
    if(st.reps===''||st.reps==null)st.reps=String(x.hi);st.ok=true;
@@ -1256,14 +1270,14 @@ const A={
 };
 const $=s=>document.querySelector(s);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a]){e.preventDefault();A[b.dataset.a](b,e);return}
-  if(e.target===ov)closeEditor();if(e.target===ov2)closePicker()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!ov2.hidden)closePicker();else if(!ov.hidden)closeEditor()}});
+  if(e.target===ov)A.close();if(e.target===ov2)closePicker()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!ov2.hidden)closePicker();else if(!ov.hidden)A.close()}});
 document.addEventListener('input',e=>{const t=e.target;
   if(t.dataset.ed&&ED){ED[t.dataset.ed]=t.type==='number'?(t.value===''?null:+t.value):t.value;
     if(ED.type==='run'&&t.dataset.ed==='time'&&toSec(ED.time)){ED.duration=Math.round(toSec(ED.time)/60);const du=$('#e-dur');if(du)du.value=ED.duration}
     if(ED.type==='run'&&(t.dataset.ed==='distance'||t.dataset.ed==='time')){const p=toSec(ED.time)&&num(ED.distance)?toSec(ED.time)/num(ED.distance):null;const el=$('#e-pace');if(el)el.textContent=p?fmtPace(p)+' /km':'–'}}
   if(t.dataset.ed&&ED&&ED.type!=='run'){const dv=$('#e-derived');if(dv)dv.innerHTML=derived(ED)}
-  if(t.dataset.set&&ED){const st=ED.exercises[+t.dataset.ei].sets[+t.dataset.si];if(t.dataset.set==='ok')st.ok=t.checked;else st[t.dataset.set]=t.value}
+  if(t.dataset.set&&ED){const st=ED.exercises[+t.dataset.ei].sets[+t.dataset.si];if(t.dataset.set==='ok')st.ok=t.checked;else st[t.dataset.set]=t.value;saveDraft()}
   if(t.id==='e-pacein'&&ED){const p=toSec(t.value),d=num(ED.distance);if(p&&d){ED.time=fmtSec(p*d);ED.duration=Math.round(p*d/60);const ti=$('#e-time');if(ti)ti.value=ED.time;const du=$('#e-dur');if(du)du.value=ED.duration}}
   if(t.id==='exq'){UI.exQuery=t.value;const pos=t.selectionStart;render();const n=$('#exq');n.focus();n.setSelectionRange(pos,pos)}
 });

@@ -146,11 +146,14 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:
 .exdetail .tip{background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:13.5px;margin-top:10px}
 
 /* overlay sheets */
-.ov{position:fixed;inset:0;z-index:40;background:rgba(10,14,12,.5);display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden}
+.ov{position:fixed;inset:0;z-index:40;padding-top:max(12px,env(safe-area-inset-top,0px));background:rgba(10,14,12,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;max-height:92dvh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden}
 @media (min-width:760px){.ov{align-items:center}.sheet{border-radius:16px;max-height:88vh}}
 .sheet-h{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;justify-content:space-between;gap:10px;align-items:center}
 .sheet-b{padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.backb{padding-inline:4px;font-weight:700;white-space:nowrap}
+.btn.wide{width:100%;justify-content:center;min-height:48px;font-size:16px}
+#ov2{z-index:45}
 .sheet-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface);display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center}
 .x{background:none;border:0;font-size:22px;line-height:1;padding:4px 8px;color:var(--muted)}
 
