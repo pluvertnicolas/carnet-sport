@@ -54,7 +54,7 @@ App web personnelle d'entraînement pour Nicolas (Bordeaux). Vanilla JS, aucune 
 
 ## Pistes prioritaires
 
-1. Saisie des séries plus rapide en salle (boutons +/−, minuteur de repos automatique, écran qui reste allumé avec l'API Wake Lock).
+1. Fait : saisie rapide des séries (`setRow`, actions `stepSet` et `okSet`), minuteur de repos automatique (`startTimer`, `restFor`, réglage `profile.rest`), Wake Lock (`keepAwake`).
 2. Synchro entre appareils (Supabase ou Firebase), localStorage gardé comme cache hors ligne.
 3. OAuth Strava via un Cloudflare Worker (le client secret ne doit jamais être côté navigateur).
 4. Découpage de `app.js` en modules ES et tests unitaires des fonctions de logique.
