@@ -29,6 +29,9 @@ App web personnelle d'entraînement pour Nicolas (Bordeaux). Vanilla JS, aucune 
   - `acwr()` : charge sRPE (durée × RPE) sur 7 jours vs moyenne 28 jours.
 - Vues : `vToday`, `vCalendar`, `vLibrary`, `vExercises`, `vProgress`, `vSettings`, plus l'éditeur `renderSheet`. Rendu par `innerHTML` + délégation d'événements : les boutons portent `data-a="nomAction"` et les actions sont dans l'objet `A`.
 
+- Demande en langage naturel (carte « Demande ta séance » sur Aujourd'hui) : `parseAsk(texte)` extrait durée, jour, lieu, forme, intensité, envies (`FOCUS`), refus (« pas de… ») et douleurs ; `answerAsk(texte)` re-score `rankTemplates` (envie +40, refus −200, douleur incompatible −150) et renvoie la réponse HTML. 100 % local, sans IA. Pour brancher une IA plus tard, remplacer `parseAsk` par un appel qui renvoie le même objet.
+- Versions courtes : une séance muscu plus longue que le temps dispo est raccourcie (`exFor`) aux exercices principaux.
+
 ## Modèle d'une séance
 
 ```js

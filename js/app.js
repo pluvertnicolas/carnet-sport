@@ -354,10 +354,12 @@ function rankTemplates(date,pool,avail,crit={}){
   const out=[];
   for(const t of TPL){
     if(lieu&&!t.loc.includes(lieu))continue;
-    const fits=t.flex?avail>=(t.id==='longue'?60:25):t.dur<=avail+5;if(!fits)continue;
-    const dur=t.flex?Math.min(avail,{longue:100,ef:60,recup:40}[t.id]):t.dur;
+    const trim=!t.flex&&t.type==='muscu'&&t.dur>avail+5&&avail>=30;
+    const fits=t.flex?avail>=(t.id==='longue'?60:25):(t.dur<=avail+5||trim);if(!fits)continue;
+    const dur=t.flex?Math.min(avail,{longue:100,ef:60,recup:40}[t.id]):trim?avail:t.dur;
     const k=normKey(t.key,targets);const deficit=(targets[k]||0)-(counts[k]||0);
     let score=deficit*10-order.indexOf(k)*0.5;const why=[];
+    if(trim)score-=3;score+=Math.min(dur,avail)/Math.max(avail,1)*6;if(forme>=4&&t.type==='mob')score-=5;
     if(deficit>0)why.push(`${keyLabel(k)} : ${counts[k]||0}/${targets[k]} cette semaine pour ton objectif.`);
     if(t.legs&&dLegs<2){score-=100;why.push('Attention : jambes travaillées il y a moins de 48 h.')}
     if(t.hard&&dHard<=1){score-=60}
@@ -379,7 +381,7 @@ function rankTemplates(date,pool,avail,crit={}){
     if(t.hard&&dHard>=2&&forme>=3)why.push('48 h de récupération depuis ta dernière séance intense.');
     if(!t.legs&&lastLegs&&dLegs<2)why.push(('Tes jambes récupèrent de la séance du '+fmtShort(lastLegs.date)+'.').replace('..','.'));
     if(lastHard&&dHard<=1&&!t.hard)why.push('Séance intense la veille ('+esc(lastHard.title)+') : on reste modéré.');
-    if(forme<=2&&!t.hard)why.push(`Forme « ${FORME[forme].toLowerCase()} » : priorité à la récupération.`);
+    if(forme<=2&&!t.hard)why.push(t.type==='mob'?`Forme « ${FORME[forme].toLowerCase()} » : priorité à la récupération.`:`Forme « ${FORME[forme].toLowerCase()} » : séance modérée, sans intensité.`);
     if(forme>=4&&t.hard&&dHard>=2)why.push('Bonne forme et récupération suffisante : bon jour pour de la qualité.');
     if(t.type==='run'&&km7>0)why.push(`${km7.toFixed(1)} km courus sur les 7 derniers jours.`);
     if(deload)why.push('Semaine allégée (4e semaine du cycle) : une série de moins, running raccourci.');
@@ -416,11 +418,14 @@ function suggestion(exId,lo,hi,beforeDate){
   return{load:L,txt:`Même charge (${L}${kgTxt(e)}) : ajoute 1 rep par série jusqu'à ${hi}, puis la charge monte.`};
 }
 
+function exFor(t,dur){return t.ex&&t.type==='muscu'&&dur&&dur<t.dur-5?t.ex.slice(0,Math.max(3,Math.floor((dur-10)/9))):t.ex}
 function instantiate(t,date,opts={}){
   const deload=isDeload(date);
   const s={id:uid(),date,type:t.type,key:t.key,sub:t.sub||null,tplId:t.id,title:t.name,status:'planned',
     duration:Math.round((opts.dur||t.dur)*(deload&&t.type==='run'?0.75:1)),rpe:null,legs:t.legs,hard:t.hard,notes:'',auto:!!opts.auto,lieu:opts.lieu||null};
-  if(t.ex)s.exercises=t.ex.map(([id,n,lo,hi])=>{const sets=Math.max(1,n-(deload?1:0));const sg=suggestion(id,lo,hi,date);
+  const exList=exFor(t,opts.dur);
+  if(exList&&exList!==t.ex)s.notes='Version courte ('+opts.dur+' min) : exercices principaux seulement.';
+  if(t.ex)s.exercises=exList.map(([id,n,lo,hi])=>{const sets=Math.max(1,n-(deload?1:0));const sg=suggestion(id,lo,hi,date);
     return{exId:id,lo,hi,sets:Array.from({length:sets},()=>({reps:'',load:sg.load===''?'':sg.load,ok:false}))}});
   if(t.warm)s.plan='Échauffement : vélo 10 min en montée progressive (cadence 85 à 90). Première série de chaque machine à 50 % de la charge, 10 reps.';
   if(t.circuit)s.plan=`${t.circuit} tours enchaînés, sans pause entre les exercices. 2 min de repos entre les tours.`;
@@ -531,6 +536,112 @@ function sessItem(s){
   return `<button class="sitem t-${s.type}" data-a="open" data-id="${s.id}"><span class="stripe"></span><span class="main"><span class="ttl">${esc(s.title)}</span><br><span class="meta tn">${SPORTS[sp].n} · ${s.duration||'?'} min${extra}</span></span>${st}</button>`;
 }
 
+/* ================= DEMANDE EN LANGAGE NATUREL ================= */
+// Analyse locale (sans IA ni réseau) d'une phrase du type « 45 min à la salle, un peu fatigué, envie de pecs ».
+const norm=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[’']/g,' ');
+const WORDNUM={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,dix:10,quinze:15,vingt:20,trente:30,quarante:40,cinquante:50};
+const FOCUS=[
+ ['push',/\b(pecs?|pectoraux|poitrine|epaules?|triceps|developpe|push)\b/],
+ ['pull',/\b(dos|biceps|tirage|rowing|pull)\b/],
+ ['legs',/\b(jambes?|cuisses?|fessiers?|squats?|quadri\w*|ischio\w*|mollets?|presse)\b/],
+ ['run_q',/\b(fractionne|vma|intervalles?|fartlek|seuil|vite|vitesse|chrono)\b/],
+ ['run_l',/\b(sortie longue|longue sortie|long)\b/],
+ ['run',/\b(cour(ir|se|s)|footing|running|jogging|trail|foot?ing)\b/],
+ ['velo',/\b(velo|spinning|bike|biking)\b/],
+ ['cardio',/\b(cardio|elliptique|rameur|escaliers?|marche|tapis|transpirer|bruler|endurance)\b/],
+ ['core',/\b(abdos?|gainage|sangle|abdominaux|planche|core)\b/],
+ ['mob',/\b(etirements?|mobilite|stretching|souplesse|yoga|recup\w*|relach\w*)\b/],
+ ['circuit',/\b(circuit|hiit|tabata|full ?body|crossfit|bootcamp)\b/],
+ ['muscu',/\b(muscu\w*|renfo\w*|haut du corps|bras|force|poids|machines?)\b/]];
+function parseAsk(raw){const t=' '+norm(raw)+' ';const r={raw,focus:[],avoid:[],pains:[],notes:[]};
+  // durée
+  let m;
+  if((m=t.match(/(\d+)\s*h(?:eures?)?\s*(\d{1,2})?/)))r.time=+m[1]*60+(+m[2]||0);
+  else if(/une heure et demie|1 heure et demie/.test(t))r.time=90;
+  else if(/une heure|1 heure/.test(t))r.time=60;
+  if(!r.time&&(m=t.match(/(\d+)\s*(?:min|mn|minutes?|')/)))r.time=+m[1];
+  if(!r.time&&(m=t.match(/\b(dix|quinze|vingt|trente|quarante|cinquante)\s*(?:min|minutes)/)))r.time=WORDNUM[m[1]];
+  if(!r.time&&/demi[ -]?heure/.test(t))r.time=30;
+  if(!r.time&&/quart d heure/.test(t))r.time=15;
+  if(/\bet demi(e)?\b/.test(t)&&r.time&&r.time%60===0)r.time+=30;
+  // jour
+  r.date=today();
+  if(/apres[ -]?demain/.test(t))r.date=addDays(today(),2);else if(/\bdemain\b/.test(t))r.date=addDays(today(),1);
+  else{const days=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];days.forEach((d,i)=>{if(new RegExp('\\b'+d+'\\b').test(t)){let k=(i-parseD(today()).getDay()+7)%7;r.date=addDays(today(),k)}})}
+  // lieu
+  if(/\b(maison|chez moi|appart\w*|domicile|salon|hotel|chambre)\b/.test(t))r.lieu='maison';
+  else if(/\b(salle|gym|club|fitness|basic|keep cool|on air|neoness)\b/.test(t))r.lieu='salle';
+  else if(/\b(dehors|exterieur|parc|plage|foret|piste|route|quais?|nature|bord de|en plein air)\b/.test(t))r.lieu='exterieur';
+  // forme
+  if(/\b(epuise|creve|ko|mort|explose|vide|a plat|tres fatigue|claque)\b/.test(t))r.forme=1;
+  else if(/\b(fatigue|pas en forme|bof|courbatu\w*|mal dormi|lourd|pas trop la forme|moyen)\b/.test(t))r.forme=2;
+  else if(/\b(au top|pleine forme|en feu|chaud|a fond|tres en forme|super forme)\b/.test(t))r.forme=5;
+  else if(/\b(en forme|bien|motive|frais|ca va)\b/.test(t))r.forme=4;
+  // intensité
+  if(/\b(tranquille|leger|legere|cool|doux|douce|facile|light|calme|pepere)\b/.test(t))r.intensity='easy';
+  if(/\b(intense|dur|se defoncer|me defoncer|transpirer|tout donner|a bloc|exigeant)\b/.test(t))r.intensity='hard';
+  // douleurs
+  const PAIN={genou:'genou',genoux:'genou',cheville:'cheville',chevilles:'cheville',mollet:'mollet',mollets:'mollet',ischio:'ischio',ischios:'ischio',dos:'dos',lombaires:'dos',epaule:'epaule',epaules:'epaule',coude:'coude',poignet:'poignet',hanche:'hanche'};
+  const pm=t.matchAll(/\b(?:mal|douleur|douleurs|blesse|bless\w+|gene|tendinite|douloureux)\b\s*(?:au|a la|aux|a l|de|du|des|la|le|les|au niveau (?:du|de la|des))?\s*(\w+)/g);
+  for(const x of pm){if(PAIN[x[1]])r.pains.push(PAIN[x[1]])}
+  // envies et refus (« pas de course », « sans courir », « pas envie de muscu »)
+  const neg=[...t.matchAll(/\b(?:pas|sans|ni|aucune?|surtout pas|evite\w*)\b\s+(?:d envie de |envie de |de |d |du |la |le |les )?([a-z ]{3,30})/g)].map(x=>x[1]);
+  FOCUS.forEach(([k,re])=>{const isNeg=neg.some(n=>re.test(' '+n+' '));if(isNeg)r.avoid.push(k);else if(re.test(t))r.focus.push(k)});
+  if(r.focus.includes('run_q')||r.focus.includes('run_l'))r.focus=r.focus.filter(f=>f!=='run');
+  if(r.pains.includes('dos')&&r.focus.includes('pull')&&!/\b(muscler|travailler|faire)\s+(le\s+)?dos\b/.test(t))r.focus=r.focus.filter(f=>f!=='pull');
+  return r}
+const FOCUS_LABEL={push:'pecs, épaules, triceps',pull:'dos, biceps',legs:'jambes',run:'course',run_q:'course rapide',run_l:'sortie longue',velo:'vélo',cardio:'cardio',core:'abdos et gainage',mob:'mobilité et récupération',circuit:'circuit',muscu:'muscu'};
+function tplFocus(t){const f=[];if(t.sub==='push')f.push('push','muscu');if(t.sub==='pull')f.push('pull','muscu');if(t.sub==='bas'||t.legs&&t.type==='muscu')f.push('legs','muscu');
+  if(t.type==='run'){f.push('run','cardio');if(t.key==='run_q')f.push('run_q');if(t.key==='run_l')f.push('run_l')}
+  if(t.type==='cardio'){f.push('cardio');if(t.sport==='velo_salle')f.push('velo')}
+  if(t.type==='mob')f.push('mob');if(['core'].includes(t.id))f.push('core');if(['renfo_run','circuit','home_circuit'].includes(t.id))f.push('core','muscu');
+  if(['circuit','home_circuit','velo_hiit'].includes(t.id))f.push('circuit','cardio');if(t.type==='muscu')f.push('muscu');return f}
+function painConflict(t,pains){const legsy=t.legs||t.type==='run'||['escaliers_int','jump_squat'].includes(t.id);
+  if(pains.some(p=>['genou','cheville','mollet','ischio','hanche'].includes(p))&&legsy&&t.type!=='mob')return true;
+  if(pains.includes('dos')&&(t.sub==='pull'||t.id==='legs'))return true;
+  if(pains.some(p=>['epaule','coude','poignet'].includes(p))&&(t.sub==='push'||t.sub==='pull'||t.id==='home_circuit'||t.id==='circuit'))return true;
+  return false}
+function answerAsk(raw){const q=parseAsk(raw);const dflt=critDefaults();
+  const time=q.time||(+S.profile.avail[parseD(q.date).getDay()]||dflt.time||45);const lieu=q.lieu||dflt.lieu;const forme=q.forme||3;
+  let list=rankTemplates(q.date,S.sessions.filter(s=>s.status==='done'||s.date<q.date),time,{forme,lieu});
+  list=list.map(x=>{const f=tplFocus(x.tpl);let sc=x.score;const why=[...x.why];
+    const hit=q.focus.filter(k=>f.includes(k));if(q.focus.length){if(hit.length)sc+=40+hit.length*5;else sc-=25}
+    if(q.focus.includes('core')&&x.tpl.id==='core')sc+=10;if(q.focus.includes('mob')&&x.tpl.type==='mob')sc+=10;
+    if(q.avoid.some(k=>f.includes(k)))sc-=200;
+    if(painConflict(x.tpl,q.pains)){sc-=150}
+    if(q.intensity==='easy'&&x.tpl.hard)sc-=35;if(q.intensity==='hard'&&x.tpl.hard)sc+=15;if(q.intensity==='hard'&&x.tpl.type==='mob')sc-=20;
+    return{...x,score:sc,why}}).sort((a,b)=>b.score-a.score);
+  const understood=[`${time>=60?Math.floor(time/60)+' h'+(time%60?' '+pad2(time%60):''):time+' min'}`,LIEUX[lieu].toLowerCase(),q.forme?'forme : '+FORME[forme].toLowerCase():null,
+    q.date!==today()?fmtDay(q.date):null,q.focus.length?'envie : '+[...new Set(q.focus.map(k=>FOCUS_LABEL[k]))].join(', '):null,
+    q.avoid.length?'sans '+[...new Set(q.avoid.map(k=>FOCUS_LABEL[k]))].join(', '):null,q.pains.length?'douleur : '+[...new Set(q.pains)].join(', '):null,
+    q.intensity==='easy'?'intensité légère':q.intensity==='hard'?'intensité élevée':null].filter(Boolean);
+  const best=list[0];
+  if(!best||best.score<-80)return{q,html:`<p>Compris : ${esc(understood.join(' · '))}.</p><p>Aucune séance ne colle à tout ça. Essaie avec plus de temps ou un autre lieu.</p>`};
+  const notes=[];
+  if(q.pains.length)notes.push(`Avec une douleur (${esc([...new Set(q.pains)].join(', '))}), j'évite ce qui charge la zone. Si ça persiste plus de quelques jours, fais-la voir.`);
+  if(lieu==='maison'&&q.focus.some(k=>['push','pull','legs'].includes(k)))notes.push('À la maison, pas de machines : je te propose du poids du corps ou des haltères.');
+  if(forme===1)notes.push('Épuisé : le repos complet est aussi un bon choix aujourd\'hui.');
+  const alts=list.slice(1).filter(x=>x.score>-80&&x.tpl.id!==best.tpl.id).filter((x,i,a)=>a.findIndex(y=>y.tpl.type===x.tpl.type&&y.tpl.sub===x.tpl.sub)===i).slice(0,2);
+  const btn=(x,cls)=>`<button class="btn sm ${cls||''}" data-a="askStart" data-t="${x.tpl.id}" data-dur="${x.dur}" data-d="${q.date}" data-l="${lieu}">${q.date===today()?'Démarrer':'Planifier le '+fmtShort(q.date)}</button>`;
+  const html=`<p class="small muted" style="margin:0">Compris : ${esc(understood.join(' · '))}.</p>
+   <div class="askpick t-${best.tpl.type}"><div class="spread">${typeChip(best.tpl.type)}<span class="tn small muted">${best.dur} min</span></div><b class="askname">${esc(best.tpl.name)}</b>
+   ${best.tpl.run?`<div class="small">${esc(runPlan(best.tpl.run,best.dur,lieu))}</div>`:best.tpl.cardio?`<div class="small">${esc(cardioPlan(best.tpl.cardio,best.dur))}</div>`:best.tpl.ex?`<div class="small muted">${exFor(best.tpl,best.dur).map(e=>esc(EX[e[0]].n)).join(' · ')}${exFor(best.tpl,best.dur)!==best.tpl.ex?' (version courte)':''}</div>`:''}
+   ${best.why.length?`<ul class="why small">${best.why.slice(0,3).map(w=>`<li>${w}</li>`).join('')}</ul>`:''}
+   <div class="row">${btn(best,'primary')}${q.date===today()?`<button class="btn sm" data-a="askPlan" data-t="${best.tpl.id}" data-dur="${best.dur}" data-d="${q.date}" data-l="${lieu}">Ajouter au calendrier</button>`:''}</div></div>
+   ${notes.map(n=>`<p class="small" style="margin:0">${n}</p>`).join('')}
+   ${alts.length?`<div class="alts"><div class="eyebrow">Sinon</div>${alts.map(x=>`<div class="alt"><span>${typeChip(x.tpl.type)} <b>${esc(x.tpl.name)}</b> <span class="muted tn">${x.dur} min</span></span>${btn(x)}</div>`).join('')}</div>`:''}`;
+  return{q,html}}
+UI.chat=[];
+function askCard(){const msgs=UI.chat;
+  const chips=['45 min à la salle, envie de pecs','30 min chez moi, un peu fatigué','1 h dehors, je veux courir tranquille','Demain 1 h 30 à la salle, en forme, pas de jambes'];
+  return `<div class="card stack askcard"><div class="spread"><h2>Demande ta séance</h2>${msgs.length?'<button class="btn ghost sm" data-a="askClear">Effacer</button>':''}</div>
+   ${msgs.length?`<div class="chat" id="chat">${msgs.map(m=>m.who==='me'?`<div class="msg me">${esc(m.text)}</div>`:`<div class="msg bot">${m.html}</div>`).join('')}</div>`:
+     `<p class="small muted" style="margin:0">Écris comme tu parles : temps dispo, lieu, forme, envies, douleurs. Je te propose la séance adaptée.</p>
+      <div class="chips">${chips.map(c=>`<button class="chipb" data-a="askChip" data-q="${esc(c)}">${esc(c)}</button>`).join('')}</div>`}
+   <form class="askform" id="askform"><input type="text" id="askin" placeholder="Ex. 40 min à la salle, mal au genou, envie du haut du corps" autocomplete="off" enterkeyhint="send" aria-label="Ta demande"><button class="btn primary" type="submit">Envoyer</button></form></div>`}
+function sendAsk(text){text=String(text||'').trim();if(!text)return;const a=answerAsk(text);UI.chat.push({who:'me',text},{who:'bot',html:a.html});if(UI.chat.length>12)UI.chat=UI.chat.slice(-12);
+  render();const c=document.getElementById('chat');if(c){const last=c.lastElementChild;if(last)last.scrollIntoView({block:'start',behavior:'smooth'})}}
+
 /* ================= VIEW: TODAY ================= */
 function critDefaults(){const av=+S.profile.avail[parseD(today()).getDay()]||45;return{time:av,forme:3,lieu:S.profile.lieu||'salle'}}
 function seg(name,val,opts){return `<div class="seg" role="group">${opts.map(([v,l])=>`<button data-a="crit" data-k="${name}" data-v="${v}" aria-pressed="${String(val)===String(v)}">${l}</button>`).join('')}</div>`}
@@ -590,7 +701,7 @@ function vToday(){
   const r=acwr();const st=acwrState(r.ratio);
   const upcoming=S.sessions.filter(s=>s.date>t0&&s.status!=='done').sort((a,b)=>a.date<b.date?-1:1).slice(0,3);
   return `<div class="head"><span class="eyebrow">${fmtDay(t0)}${isDeload(t0)?' · semaine allégée':''}</span><h1>Aujourd'hui</h1></div>
-  <div class="stack">${top}${recoCard()}${stravaLine()}${quickLogCard()}</div>
+  <div class="stack">${top}${askCard()}${recoCard()}${stravaLine()}${quickLogCard()}</div>
   <div class="section"><div class="spread"><h2>Cette semaine</h2><button class="btn sm" data-a="genWeek" data-d="${ws}">Planifier ma semaine</button></div>
     <div class="week">${week}</div><div class="row">${targ}</div></div>
   <div class="section"><h2>Forme</h2><div class="kpis">
@@ -1229,6 +1340,10 @@ const A={
  delNo:()=>{UI.confirmDel=false;renderSheet()},
  delYes:()=>{const id=ED.id;if(ED.stravaId){S.profile.stravaIgnored=[...(S.profile.stravaIgnored||[]),ED.stravaId];persistProfile()}S.sessions=S.sessions.filter(s=>s.id!==id);persistDelete(id);closeEditor();toast('Séance supprimée');render()},
  crit:b=>{UI.crit=UI.crit||critDefaults();const k=b.dataset.k;UI.crit[k]=k==='lieu'?b.dataset.v:+b.dataset.v;render()},
+ askStart:b=>{const d=b.dataset.d,t=TPLBY[b.dataset.t],o={dur:+b.dataset.dur,lieu:b.dataset.l};if(d===today())openEditor(instantiate(t,d,o),true);else{makeReal();upsert(instantiate(t,d,o));toast('Planifiée le '+fmtShort(d));render()}},
+ askPlan:b=>{makeReal();upsert(instantiate(TPLBY[b.dataset.t],b.dataset.d,{dur:+b.dataset.dur,lieu:b.dataset.l}));toast('Ajoutée au calendrier');render()},
+ askChip:b=>sendAsk(b.dataset.q),
+ askClear:()=>{UI.chat=[];render()},
  startReco:b=>{openEditor(instantiate(TPLBY[b.dataset.t],today(),{dur:+b.dataset.dur,lieu:UI.crit?.lieu}),true)},
  planReco:b=>{makeReal();upsert(instantiate(TPLBY[b.dataset.t],today(),{dur:+b.dataset.dur,lieu:UI.crit?.lieu}));toast('Ajoutée à aujourd\'hui');render()},
  skipPlanned:b=>{const s=S.sessions.find(x=>x.id===b.dataset.id);if(!s)return;makeReal();S.sessions=S.sessions.filter(x=>x.id!==s.id);persistDelete(s.id);adaptAfter(today());toast('Séance retirée, semaine réajustée');render()},
@@ -1271,6 +1386,7 @@ const A={
 const $=s=>document.querySelector(s);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a]){e.preventDefault();A[b.dataset.a](b,e);return}
   if(e.target===ov)A.close();if(e.target===ov2)closePicker()});
+document.addEventListener('submit',e=>{if(e.target.id==='askform'){e.preventDefault();const i=document.getElementById('askin');const v=i.value;i.value='';sendAsk(v)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!ov2.hidden)closePicker();else if(!ov.hidden)A.close()}});
 document.addEventListener('input',e=>{const t=e.target;
   if(t.dataset.ed&&ED){ED[t.dataset.ed]=t.type==='number'?(t.value===''?null:+t.value):t.value;
