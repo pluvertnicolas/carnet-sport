@@ -1055,7 +1055,8 @@ function vSettings(){
     <label class="f">Objectif principal<select id="pGoal">${Object.entries(GOALS).map(([k,g])=>`<option value="${k}" ${p.goal===k?'selected':''}>${g.label}</option>`).join('')}</select></label>
     <label class="f">Chrono 5 km de référence<input type="text" id="pRef" value="${esc(p.ref5k)}" placeholder="mm:ss"></label>
     <label class="f">Lieu habituel<select id="pLieu">${Object.entries(LIEUX).map(([k,l])=>`<option value="${k}" ${(p.lieu||'salle')===k?'selected':''}>${l}</option>`).join('')}</select></label>
-    <label class="f">Début du cycle de 4 semaines<input type="date" id="pCycle" value="${esc(p.cycleStart)}"></label></div>
+    <label class="f">Début du cycle de 4 semaines<input type="date" id="pCycle" value="${esc(p.cycleStart)}"></label>
+    <label class="f">Repos entre séries (muscu)<select id="pRest">${[60,75,90,120,150,180].map(v=>`<option value="${v}" ${+(p.rest||90)===v?'selected':''}>${v>=120?Math.floor(v/60)+' min'+(v%60?' '+v%60+' s':''):v+' s'}</option>`).join('')}</select></label></div>
     <p class="small muted" style="margin:0">Semaine type : ${Object.entries(GOALS[p.goal].targets).map(([k,n])=>`${n} × ${keyLabel(k).toLowerCase()}`).join(', ')}.</p></div>
   <div class="card stack"><h2>Activités fixes</h2><p class="small muted" style="margin:0">Tes rendez-vous sportifs réguliers. Ils sont posés en premier dans la semaine et le reste du plan s'organise autour (pas de jambes lourdes la veille, récup le lendemain).</p>
     ${(p.recurring||[]).map((r,i)=>`<div class="recrow"><label class="f">Jour<select data-rec="${i}" data-k="dow" id="rec-dow-${i}">${[1,2,3,4,5,6,0].map(d=>`<option value="${d}" ${+r.dow===d?'selected':''}>${DOWS[d]}</option>`).join('')}</select></label>
@@ -1085,10 +1086,11 @@ function vSettings(){
 
 /* ================= SESSION EDITOR ================= */
 const ov=document.getElementById('ov'),ov2=document.getElementById('ov2');
-function openEditor(s,isNew){ED=clone(s);ED._new=!!isNew;UI.confirmDel=false;renderSheet();ov.hidden=false}
-function closeEditor(){ED=null;ov.hidden=true;ov.innerHTML='';stopTimer()}
+function openEditor(s,isNew){ED=clone(s);ED._new=!!isNew;UI.confirmDel=false;ov.innerHTML='';renderSheet();ov.hidden=false;if(ED.exercises&&ED.exercises.length)keepAwake(true)}
+function closeEditor(){ED=null;ov.hidden=true;ov.innerHTML='';stopTimer();keepAwake(false)}
 function renderSheet(){
   if(!ED){return}
+  const ob=ov.querySelector('.sheet-b');const keepScroll=ob?ob.scrollTop:0;
   const s=ED;let body='';
   body+=`<div class="fields"><label class="f">Activité<select id="e-sport">${sportOptions(sportOf(s))}</select></label><label class="f">Titre<input type="text" id="e-title" data-ed="title" value="${esc(s.title)}"></label><label class="f">Date<input type="date" id="e-date" data-ed="date" value="${s.date}"></label><label class="f">Durée (min)<input type="number" id="e-dur" data-ed="duration" min="0" value="${s.duration??''}" inputmode="numeric"></label></div>`;
   if(s.plan)body+=`<div class="plan"><div class="eyebrow" style="margin-bottom:4px">Contenu de la séance</div>${esc(s.plan)}</div>`;
@@ -1100,17 +1102,29 @@ function renderSheet(){
   if(s.exercises){body+=s.exercises.map((x,ei)=>{const e=EX[x.exId];const sg=suggestion(x.exId,x.lo,x.hi,addDays(s.date,-1));const u=e.unit;
     return `<div class="exc"><div class="spread"><div class="row" style="flex-wrap:nowrap;min-width:0"><button class="thumbbtn" data-a="exInfo" data-id="${x.exId}" aria-label="Voir le mouvement">${figThumb(x.exId)}</button><div style="min-width:0"><b>${esc(e.n)}</b><div class="small muted tn">${x.sets.length} × ${x.lo===x.hi?x.lo:x.lo+'-'+x.hi}${u==='sec'?' s':' reps'}${e.assist?' · charge = assistance':''}</div></div></div><div class="row"><button class="btn sm" data-a="exInfo" data-id="${x.exId}">Mouvement</button><button class="btn ghost sm danger" data-a="rmEx" data-ei="${ei}" aria-label="Retirer l'exercice">Retirer</button></div></div>
     ${sg.txt?`<div class="sugg">${esc(sg.txt)}</div>`:''}
-    <table class="sets"><tr><th>#</th><th>${u==='sec'?'Secondes':'Reps'}</th>${u==='kg'?(e.perHand?'<th>kg / haltère</th>':'<th>kg</th>'):'<th>Lest kg</th>'}<th class="ck">OK</th></tr>
-    ${x.sets.map((st,si)=>`<tr><td class="tn">${si+1}</td><td><input type="number" inputmode="numeric" id="r-${ei}-${si}" data-set="reps" data-ei="${ei}" data-si="${si}" value="${esc(st.reps)}" placeholder="${x.hi}"></td><td><input type="number" inputmode="decimal" step="0.5" id="l-${ei}-${si}" data-set="load" data-ei="${ei}" data-si="${si}" value="${esc(st.load)}" placeholder="${u==='kg'?'kg':'–'}"></td><td class="ck"><input type="checkbox" id="c-${ei}-${si}" data-set="ok" data-ei="${ei}" data-si="${si}" ${st.ok?'checked':''} aria-label="Série faite"></td></tr>`).join('')}</table>
+    <div class="sets">${(()=>{const cur=x.sets.findIndex(st=>!st.ok);return x.sets.map((st,si)=>setRow(x,e,ei,si,st,si===cur)).join('')})()}</div>
     <div class="row"><button class="btn ghost sm" data-a="addSet" data-ei="${ei}">+ Série</button>${x.sets.length>1?`<button class="btn ghost sm" data-a="rmSet" data-ei="${ei}">− Série</button>`:''}</div></div>`}).join('');
     body+=`<label class="f">Ajouter un exercice<select id="addEx"><option value="">Choisir…</option>${Object.entries(GROUPS).map(([g,l])=>`<optgroup label="${l}">${Object.entries(EX).filter(([,e])=>e.g===g).map(([id,e])=>`<option value="${id}">${esc(e.n)}</option>`).join('')}</optgroup>`).join('')}</select></label>`}
   body+=`<div><div class="eyebrow" style="margin-bottom:6px">Effort ressenti (RPE)</div><div class="rpe">${Array.from({length:10},(_,i)=>`<button data-a="rpe" data-n="${i+1}" aria-pressed="${s.rpe===i+1}">${i+1}</button>`).join('')}</div><div class="small muted" style="margin-top:4px">${s.rpe?RPE_TXT[s.rpe]:'Note l\'effort global à la fin. Cible muscu débutant : 7 à 8.'}</div></div>`;
   body+=`<label class="f">Notes<textarea id="e-notes" data-ed="notes" placeholder="Sensations, douleurs, réglages machine…">${esc(s.notes)}</textarea></label>`;
   const foot=UI.confirmDel?`<span class="small">Supprimer définitivement ?</span><div class="row"><button class="btn sm" data-a="delNo">Annuler</button><button class="btn sm danger" data-a="delYes">Supprimer</button></div>`:
-   `<div class="row">${s.exercises?`<button class="btn sm" data-a="timer" data-n="90">Repos 90 s</button><span class="timer" id="timer" hidden></span>`:''}${!s._new?`<button class="btn ghost sm danger" data-a="delAsk">Supprimer</button>`:''}</div>
+   `<div class="row">${s.exercises?`<button class="btn sm" data-a="timer" data-n="${S.profile.rest||90}">Repos ${S.profile.rest||90} s</button>`:''}${!s._new?`<button class="btn ghost sm danger" data-a="delAsk">Supprimer</button>`:''}</div>
    <div class="row"><button class="btn" data-a="saveSess">${s._new?'Planifier':'Enregistrer'}</button><button class="btn primary" data-a="finishSess">${s.status==='done'?'Mettre à jour':'Séance faite'}</button></div>`;
-  ov.innerHTML=`<div class="sheet t-${s.type}" role="dialog" aria-modal="true" aria-label="${esc(s.title)}"><div class="sheet-h"><div class="row">${typeChip(s.type)}${s.stravaId?'<span class="strava small">Strava</span>':''}<span class="pill ${s.status==='done'?'ok':'neutral'}">${s.status==='done'?'Faite':'Prévue'}</span></div><button class="x" data-a="close" aria-label="Fermer">×</button></div><div class="sheet-b">${body}</div><div class="sheet-f">${foot}</div></div>`;
+  ov.innerHTML=`<div class="sheet t-${s.type}" role="dialog" aria-modal="true" aria-label="${esc(s.title)}"><div class="sheet-h"><div class="row">${typeChip(s.type)}${s.stravaId?'<span class="strava small">Strava</span>':''}<span class="pill ${s.status==='done'?'ok':'neutral'}">${s.status==='done'?'Faite':'Prévue'}</span></div><button class="x" data-a="close" aria-label="Fermer">×</button></div><div class="sheet-b">${body}</div>${timerBar()}<div class="sheet-f">${foot}</div></div>`;
+  const nb=ov.querySelector('.sheet-b');if(nb&&keepScroll)nb.scrollTop=keepScroll;
 }
+const CHECK='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function setRow(x,e,ei,si,st,cur){const u=e.unit;const rl=u==='sec'?'secondes':'reps';const ll=u==='kg'?(e.perHand?'kg / haltère':'kg'):'lest kg';
+  const stp=(f,v,ph,im,lab)=>`<div class="stp"><button class="sb" data-a="stepSet" data-f="${f}" data-d="-1" data-ei="${ei}" data-si="${si}" aria-label="Moins ${lab}">−</button><input type="number" inputmode="${im}" step="any" id="${f[0]}-${ei}-${si}" data-set="${f}" data-ei="${ei}" data-si="${si}" value="${esc(v)}" placeholder="${ph}" aria-label="${lab} série ${si+1}"><button class="sb" data-a="stepSet" data-f="${f}" data-d="1" data-ei="${ei}" data-si="${si}" aria-label="Plus ${lab}">+</button><span class="lab">${lab}</span></div>`;
+  return `<div class="srow${st.ok?' done':''}${cur?' cur':''}" id="row-${ei}-${si}"><span class="n tn">${si+1}</span>${stp('reps',st.reps,x.hi,'numeric',rl)}${stp('load',st.load,u==='kg'?'0':'–','decimal',ll)}<button class="okb" data-a="okSet" data-ei="${ei}" data-si="${si}" aria-pressed="${!!st.ok}" aria-label="Valider la série ${si+1}">${CHECK}</button></div>`}
+/* repos & écran allumé */
+let wakeLock=null;
+async function keepAwake(on){try{if(on&&!wakeLock&&'wakeLock' in navigator&&document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){wakeLock=null}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ED&&ED.exercises)keepAwake(true)});
+function restFor(exId){const e=EX[exId];const base=+(S.profile.rest||90);return e&&e.unit==='kg'?base:Math.min(45,base)}
+let audioCtx=null;
+function beep(){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.25,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.5);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.5)}catch(e){}}
+function timerBar(){if(!timerEnd)return '';return `<div class="restbar" id="restbar"><div><div class="eyebrow">Repos</div><span class="timer tn" id="timer">${fmtSec(Math.max(0,Math.round((timerEnd-Date.now())/1000)))}</span></div><div class="row"><button class="btn sm" data-a="timerAdd" data-n="-15">−15 s</button><button class="btn sm" data-a="timerAdd" data-n="15">+15 s</button><button class="btn sm primary" data-a="timerStop">Passer</button></div></div>`}
 const MF={dist:['distance','Distance (km)','decimal'],watts:['watts','Puissance moy. (W)','numeric'],hr:['hr','FC moyenne','numeric'],speed:['speed','Vitesse (km/h)','decimal'],
   incline:['incline','Inclinaison (%)','decimal'],floors:['floors','Étages montés','numeric'],score:['score','Score','text'],opp:['opp','Adversaire / partenaire','text'],goals:['goals','Buts','numeric']};
 function derived(s){const sp=sportOf(s),d=+s.duration||0;
@@ -1124,9 +1138,13 @@ function metricFields(s){const sp=SPORTS[sportOf(s)];const m=(sp.m||[]).filter(k
   const f=m.filter(k=>MF[k]);if(f.length)h+=`<div class="fields">${f.map(k=>{const [key,l,im]=MF[k];return `<label class="f">${l}<input type="${im==='text'?'text':'text'}" inputmode="${im==='text'?'text':im}" id="m-${key}" data-ed="${key}" value="${esc(s[key])}"></label>`}).join('')}${m.includes('goals')?`<label class="f">Passes décisives<input type="text" inputmode="numeric" id="m-assists" data-ed="assists" value="${esc(s.assists)}"></label>`:''}</div>`;
   const dv=derived(s);if(dv)h+=`<div class="small" id="e-derived">${dv}</div>`;return h}
 let timerInt=null,timerEnd=0;
-function stopTimer(){clearInterval(timerInt);timerInt=null}
-function startTimer(sec){stopTimer();timerEnd=Date.now()+sec*1000;const el=()=>document.getElementById('timer');
-  const tick=()=>{const t=el();if(!t)return stopTimer();const r=Math.max(0,Math.round((timerEnd-Date.now())/1000));t.hidden=false;t.textContent=fmtSec(r);if(r<=0){stopTimer();t.textContent='Go';try{navigator.vibrate&&navigator.vibrate(300)}catch(e){}}};tick();timerInt=setInterval(tick,500)}
+function stopTimer(){clearInterval(timerInt);timerInt=null;timerEnd=0;const b=document.getElementById('restbar');if(b)b.remove()}
+function startTimer(sec){clearInterval(timerInt);timerEnd=Date.now()+sec*1000;
+  if(!document.getElementById('restbar')){const f=ov.querySelector('.sheet-f');if(f)f.insertAdjacentHTML('beforebegin',timerBar())}
+  const tick=()=>{const t=document.getElementById('timer');if(!t){clearInterval(timerInt);return}const r=Math.max(0,Math.round((timerEnd-Date.now())/1000));t.textContent=fmtSec(r);
+    if(r<=0){clearInterval(timerInt);timerInt=null;t.textContent='Go';document.getElementById('restbar')?.classList.add('over');beep();try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+      setTimeout(()=>{if(timerEnd&&Date.now()>=timerEnd)stopTimer()},4000)}};
+  tick();timerInt=setInterval(tick,250)}
 
 function upsert(s){const c=clone(s);delete c._new;delete c.example;const i=S.sessions.findIndex(x=>x.id===c.id);if(i>=0)S.sessions[i]=c;else S.sessions.push(c);persistSession(c)}
 function commit(markDone){
@@ -1176,6 +1194,21 @@ const A={
  rmEx:b=>{ED.exercises.splice(+b.dataset.ei,1);renderSheet()},
  rpe:b=>{ED.rpe=+b.dataset.n;renderSheet()},
  timer:b=>startTimer(+b.dataset.n),
+ timerAdd:b=>{if(!timerEnd)return;timerEnd=Math.max(Date.now()+1000,timerEnd+(+b.dataset.n)*1000);if(!timerInt)startTimer((timerEnd-Date.now())/1000)},
+ timerStop:()=>stopTimer(),
+ stepSet:b=>{const ei=+b.dataset.ei,si=+b.dataset.si,f=b.dataset.f,d=+b.dataset.d;const x=ED.exercises[ei],e=EX[x.exId],st=x.sets[si];
+   let v=num(st[f]);
+   if(v==null){if(f==='reps')v=x.hi;else{const prev=x.sets.slice(0,si).map(z=>num(z.load)).filter(z=>z!=null).pop();v=prev??0}if(f==='load'&&d<0&&v===0)return}
+   else v=f==='reps'?Math.max(0,v+d*(e.unit==='sec'?5:1)):Math.max(0,Math.round((v+d*(e.step||2.5))*100)/100);
+   st[f]=String(v);const inp=document.getElementById(f[0]+'-'+ei+'-'+si);if(inp)inp.value=v;try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}},
+ okSet:b=>{const ei=+b.dataset.ei,si=+b.dataset.si;const x=ED.exercises[ei],st=x.sets[si];
+   if(st.ok){st.ok=false;renderSheet();return}
+   if(st.reps===''||st.reps==null)st.reps=String(x.hi);st.ok=true;
+   const nx=x.sets[si+1];x.sets.slice(si+1).forEach(z=>{if(!z.ok)z.load=st.load});
+   const nextEx=!nx&&ED.exercises[ei+1];const last=!nx&&!nextEx;
+   renderSheet();try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+   if(!last)startTimer(restFor(x.exId));else{stopTimer();toast('Dernière série faite. Note ton RPE puis « Séance faite ».')}
+   const target=document.getElementById(nx?`row-${ei}-${si+1}`:nextEx?`row-${ei+1}-0`:'');if(target)target.scrollIntoView({block:'center',behavior:'smooth'})},
  saveSess:()=>commit(false),
  finishSess:()=>commit(true),
  delAsk:()=>{UI.confirmDel=true;renderSheet()},
@@ -1250,6 +1283,7 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='pGoal'){p.goal=t.value;changed=true}
   if(t.id==='pRef'){if(toSec(t.value)){p.ref5k=t.value.trim();changed=true}else toast('Format attendu : mm:ss')}
   if(t.id==='pCycle'&&t.value){p.cycleStart=t.value;changed=true}
+  if(t.id==='pRest'){p.rest=+t.value;changed=true}
   if(t.dataset.av!=null){p.avail[t.dataset.av]=+t.value;changed=true}
   if(changed){if(S.example){const keepP=clone(p);leaveExamples();S.profile=keepP;S.sessions.forEach(persistSession)}persistProfile();render();toast('Réglages enregistrés')}
 });
