@@ -1,0 +1,5 @@
+# Données personnelles : ne jamais les publier sur GitHub
+donnees/
+*.json.bak
+.DS_Store
+node_modules/
