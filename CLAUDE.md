@@ -30,6 +30,7 @@ App web personnelle d'entraînement pour Nicolas (Bordeaux). Vanilla JS, aucune 
 - Vues : `vToday`, `vCalendar`, `vLibrary`, `vExercises`, `vProgress`, `vSettings`, plus l'éditeur `renderSheet`. Rendu par `innerHTML` + délégation d'événements : les boutons portent `data-a="nomAction"` et les actions sont dans l'objet `A`.
 
 - Demande en langage naturel (carte « Demande ta séance » sur Aujourd'hui) : `parseAsk(texte)` extrait durée, jour, lieu, forme, intensité, envies (`FOCUS`), refus (« pas de… ») et douleurs ; `answerAsk(texte)` re-score `rankTemplates` (envie +40, refus −200, douleur incompatible −150) et renvoie la réponse HTML. 100 % local, sans IA. Pour brancher une IA plus tard, remplacer `parseAsk` par un appel qui renvoie le même objet.
+- Demandes en plusieurs blocs (« 30/40 min de fractionné sur tapis puis 45 min de muscu ») : `splitAsk` découpe la phrase (ensuite, puis, et après, +, « et » entre deux durées), `answerCombo` choisit un modèle par bloc dans l'ordre demandé, en tenant compte des blocs précédents (pas de jambes en muscu après de la course intense). Action `comboGo` : crée une séance par bloc (« Bloc 1 · … »). Une envie explicite (fractionné, pecs…) passe devant les règles de récupération, avec un avertissement.
 - Versions courtes : une séance muscu plus longue que le temps dispo est raccourcie (`exFor`) aux exercices principaux.
 
 ## Modèle d'une séance

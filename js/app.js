@@ -252,9 +252,9 @@ const TPL=[
   ex:[['jump_squat',4,12,15],['pushup',4,10,15],['mountain_climber',4,30,40],['walking_lunge',4,10,12],['plank',4,30,40]]},
  {id:'ef',type:'run',key:'run_e',name:'Endurance fondamentale',dur:40,hard:false,legs:false,desc:'La base de 80 % de ton volume de course.',run:'ef'},
  {id:'recup',type:'run',key:'run_e',name:'Footing récup + lignes droites',dur:30,hard:false,legs:false,desc:'Très facile, avec quelques accélérations pour la foulée.',run:'recup'},
- {id:'frac_court',type:'run',key:'run_q',name:'Fractionné court 10 × 400 m',dur:45,hard:true,legs:false,desc:'Développe la vitesse maximale aérobie (VMA).',run:'frac_court'},
- {id:'frac_long',type:'run',key:'run_q',name:'Fractionné long 5 × 1000 m',dur:50,hard:true,legs:false,desc:'Travail à allure 5 km, le cœur de la progression sur 5 et 10 km.',run:'frac_long'},
- {id:'seuil',type:'run',key:'run_q',name:'Seuil 3 × 8 min',dur:45,hard:true,legs:false,desc:'Repousse le seuil lactique : tu tiens plus vite plus longtemps.',run:'seuil'},
+ {id:'frac_court',type:'run',key:'run_q',name:'Fractionné court (400 m)',dur:45,hard:true,legs:false,desc:'Développe la vitesse maximale aérobie (VMA).',run:'frac_court'},
+ {id:'frac_long',type:'run',key:'run_q',name:'Fractionné long (1000 m)',dur:50,hard:true,legs:false,desc:'Travail à allure 5 km, le cœur de la progression sur 5 et 10 km.',run:'frac_long'},
+ {id:'seuil',type:'run',key:'run_q',name:'Seuil (blocs de 8 min)',dur:45,hard:true,legs:false,desc:'Repousse le seuil lactique : tu tiens plus vite plus longtemps.',run:'seuil'},
  {id:'longue',type:'run',key:'run_l',name:'Sortie longue',dur:70,hard:false,legs:false,desc:'Endurance et économie de course. Idéal le week-end.',run:'longue'},
  {id:'mobilite',type:'mob',key:'mob',name:'Mobilité 20 min',dur:20,hard:false,legs:false,desc:'Hanches, chevilles, haut du dos. Récupération active.',
   ex:[['hip_flexor',2,45,60],['hip_9090',2,60,60],['thoracic_rot',2,8,10],['ankle_mob',2,10,12]]}
@@ -309,9 +309,9 @@ function runPlan(kind,dur,lieu){
   switch(kind){
     case 'ef':return `${dur||40} min à ${f(P.ef[0])} – ${f(P.ef[1])} /km. Tu dois pouvoir parler en phrases complètes (zone 2).`+tap;
     case 'recup':return `${dur||30} min très facile, plus lent que ${f(P.ef[1])} /km. Termine par 6 lignes droites de 80 m en accélération progressive, retour en marchant.`+tap;
-    case 'frac_court':return `Échauffement 15 min en EF + 3 accélérations. 10 × 400 m à ${f(P.i400)} /km (≈ ${fmtSec(P.i400*0.4)} par 400 m), récup 1 min 30 en trottinant. Retour au calme 10 min.`+tap;
-    case 'frac_long':return `Échauffement 15 min en EF. 5 × 1000 m à ${f(P.p5)} /km (allure 5 km), récup 2 min en trottinant. Retour au calme 10 min.`+tap;
-    case 'seuil':return `Échauffement 15 min en EF. 3 × 8 min à ${f(P.seuil)} /km (confortablement difficile), récup 2 min. Retour au calme 10 min.`+tap;
+    case 'frac_court':{const d=dur||45,wu=d<40?10:15,n=Math.max(4,Math.min(12,Math.floor((d-wu-5)/3.4)));return `Échauffement ${wu} min en EF + 3 accélérations. ${n} × 400 m à ${f(P.i400)} /km (≈ ${fmtSec(P.i400*0.4)} par 400 m), récup 1 min 30 en trottinant. Retour au calme 5 min.`+tap}
+    case 'frac_long':{const d=dur||50,wu=d<40?10:15,n=Math.max(2,Math.min(6,Math.floor((d-wu-5)/(P.p5/60+2))));return `Échauffement ${wu} min en EF. ${n} × 1000 m à ${f(P.p5)} /km (allure 5 km), récup 2 min en trottinant. Retour au calme 5 min.`+tap}
+    case 'seuil':{const d=dur||45,wu=d<40?10:15,n=Math.max(2,Math.min(4,Math.floor((d-wu-5)/10)));return `Échauffement ${wu} min en EF. ${n} × 8 min à ${f(P.seuil)} /km (confortablement difficile), récup 2 min. Retour au calme 5 min.`+tap}
     case 'longue':return `${dur||70} min à ${f(P.ef[0])} – ${f(P.ef[1])} /km. Les 10 dernières minutes un peu plus vite si tu te sens bien. Bois si tu dépasses 60 min.`+tap;
   }return '';
 }
@@ -355,8 +355,9 @@ function rankTemplates(date,pool,avail,crit={}){
   for(const t of TPL){
     if(lieu&&!t.loc.includes(lieu))continue;
     const trim=!t.flex&&t.type==='muscu'&&t.dur>avail+5&&avail>=30;
-    const fits=t.flex?avail>=(t.id==='longue'?60:25):(t.dur<=avail+5||trim);if(!fits)continue;
-    const dur=t.flex?Math.min(avail,{longue:100,ef:60,recup:40}[t.id]):trim?avail:t.dur;
+    const qflex=t.key==='run_q'&&t.type==='run';
+    const fits=t.flex?avail>=(t.id==='longue'?60:['velo_z2','marche_incl','ef','recup'].includes(t.id)?15:25):qflex?avail>=30:(t.dur<=avail+5||trim);if(!fits)continue;
+    const dur=t.flex?Math.min(avail,{longue:100,ef:60,recup:40,velo_z2:60,marche_incl:45}[t.id]||avail):qflex?Math.min(avail,t.dur):trim?avail:t.dur;
     const k=normKey(t.key,targets);const deficit=(targets[k]||0)-(counts[k]||0);
     let score=deficit*10-order.indexOf(k)*0.5;const why=[];
     if(trim)score-=3;score+=Math.min(dur,avail)/Math.max(avail,1)*6;if(forme>=4&&t.type==='mob')score-=5;
@@ -546,9 +547,9 @@ const FOCUS=[
  ['legs',/\b(jambes?|cuisses?|fessiers?|squats?|quadri\w*|ischio\w*|mollets?|presse)\b/],
  ['run_q',/\b(fractionne|vma|intervalles?|fartlek|seuil|vite|vitesse|chrono)\b/],
  ['run_l',/\b(sortie longue|longue sortie|long)\b/],
- ['run',/\b(cour(ir|se|s)|footing|running|jogging|trail|foot?ing)\b/],
+ ['run',/\b(cour(ir|se|s)|footing|running|jogging|trail|foot?ing|tapis)\b/],
  ['velo',/\b(velo|spinning|bike|biking)\b/],
- ['cardio',/\b(cardio|elliptique|rameur|escaliers?|marche|tapis|transpirer|bruler|endurance)\b/],
+ ['cardio',/\b(cardio|elliptique|rameur|escaliers?|marche|transpirer|bruler|endurance)\b/],
  ['core',/\b(abdos?|gainage|sangle|abdominaux|planche|core)\b/],
  ['mob',/\b(etirements?|mobilite|stretching|souplesse|yoga|recup\w*|relach\w*)\b/],
  ['circuit',/\b(circuit|hiit|tabata|full ?body|crossfit|bootcamp)\b/],
@@ -556,7 +557,8 @@ const FOCUS=[
 function parseAsk(raw){const t=' '+norm(raw)+' ';const r={raw,focus:[],avoid:[],pains:[],notes:[]};
   // durée
   let m;
-  if((m=t.match(/(\d+)\s*h(?:eures?)?\s*(\d{1,2})?/)))r.time=+m[1]*60+(+m[2]||0);
+  if((m=t.match(/(\d+)\s*(?:\/|-|a|ou)\s*(\d+)\s*(?:min|mn|minutes?|')/))&&+m[2]>+m[1]){r.time=+m[2];r.range=m[1]+' à '+m[2]+' min'}
+  else if((m=t.match(/(\d+)\s*h(?:eures?)?\s*(\d{1,2})?/)))r.time=+m[1]*60+(+m[2]||0);
   else if(/une heure et demie|1 heure et demie/.test(t))r.time=90;
   else if(/une heure|1 heure/.test(t))r.time=60;
   if(!r.time&&(m=t.match(/(\d+)\s*(?:min|mn|minutes?|')/)))r.time=+m[1];
@@ -564,6 +566,7 @@ function parseAsk(raw){const t=' '+norm(raw)+' ';const r={raw,focus:[],avoid:[],
   if(!r.time&&/demi[ -]?heure/.test(t))r.time=30;
   if(!r.time&&/quart d heure/.test(t))r.time=15;
   if(/\bet demi(e)?\b/.test(t)&&r.time&&r.time%60===0)r.time+=30;
+  const allMin=[...t.matchAll(/(\d+)\s*(?:min|mn|minutes?|')/g)].map(x=>+x[1]);r.multi=/(\d+)\s*h/.test(t)&&allMin.length>0;if(r.multi)r.segTime=allMin[allMin.length-1];
   // jour
   r.date=today();
   if(/apres[ -]?demain/.test(t))r.date=addDays(today(),2);else if(/\bdemain\b/.test(t))r.date=addDays(today(),1);
@@ -571,6 +574,7 @@ function parseAsk(raw){const t=' '+norm(raw)+' ';const r={raw,focus:[],avoid:[],
   // lieu
   if(/\b(maison|chez moi|appart\w*|domicile|salon|hotel|chambre)\b/.test(t))r.lieu='maison';
   else if(/\b(salle|gym|club|fitness|basic|keep cool|on air|neoness)\b/.test(t))r.lieu='salle';
+  else if(/\b(tapis|elliptique|rameur|machines?)\b/.test(t))r.lieu='salle';
   else if(/\b(dehors|exterieur|parc|plage|foret|piste|route|quais?|nature|bord de|en plein air)\b/.test(t))r.lieu='exterieur';
   // forme
   if(/\b(epuise|creve|ko|mort|explose|vide|a plat|tres fatigue|claque)\b/.test(t))r.forme=1;
@@ -588,6 +592,7 @@ function parseAsk(raw){const t=' '+norm(raw)+' ';const r={raw,focus:[],avoid:[],
   const neg=[...t.matchAll(/\b(?:pas|sans|ni|aucune?|surtout pas|evite\w*)\b\s+(?:d envie de |envie de |de |d |du |la |le |les )?([a-z ]{3,30})/g)].map(x=>x[1]);
   FOCUS.forEach(([k,re])=>{const isNeg=neg.some(n=>re.test(' '+n+' '));if(isNeg)r.avoid.push(k);else if(re.test(t))r.focus.push(k)});
   if(r.focus.includes('run_q')||r.focus.includes('run_l'))r.focus=r.focus.filter(f=>f!=='run');
+  if(/\bmarche\b/.test(t)&&!/\b(cour(ir|se|s)|footing|running)\b/.test(t))r.focus=r.focus.filter(f=>f!=='run');
   if(r.pains.includes('dos')&&r.focus.includes('pull')&&!/\b(muscler|travailler|faire)\s+(le\s+)?dos\b/.test(t))r.focus=r.focus.filter(f=>f!=='pull');
   return r}
 const FOCUS_LABEL={push:'pecs, épaules, triceps',pull:'dos, biceps',legs:'jambes',run:'course',run_q:'course rapide',run_l:'sortie longue',velo:'vélo',cardio:'cardio',core:'abdos et gainage',mob:'mobilité et récupération',circuit:'circuit',muscu:'muscu'};
@@ -601,16 +606,55 @@ function painConflict(t,pains){const legsy=t.legs||t.type==='run'||['escaliers_i
   if(pains.includes('dos')&&(t.sub==='pull'||t.id==='legs'))return true;
   if(pains.some(p=>['epaule','coude','poignet'].includes(p))&&(t.sub==='push'||t.sub==='pull'||t.id==='home_circuit'||t.id==='circuit'))return true;
   return false}
-function answerAsk(raw){const q=parseAsk(raw);const dflt=critDefaults();
-  const time=q.time||(+S.profile.avail[parseD(q.date).getDay()]||dflt.time||45);const lieu=q.lieu||dflt.lieu;const forme=q.forme||3;
-  let list=rankTemplates(q.date,S.sessions.filter(s=>s.status==='done'||s.date<q.date),time,{forme,lieu});
-  list=list.map(x=>{const f=tplFocus(x.tpl);let sc=x.score;const why=[...x.why];
+function scoreAsk(q,list){return list.map(x=>{const f=tplFocus(x.tpl);let sc=x.score;const why=[...x.why];
     const hit=q.focus.filter(k=>f.includes(k));if(q.focus.length){if(hit.length)sc+=40+hit.length*5;else sc-=25}
+    const specific=hit.filter(k=>!['muscu','cardio'].includes(k));
+    if(specific.length){sc+=120;if(x.score<-10&&x.tpl.hard)why.unshift('Tu l\'as demandé, je le garde. Ton historique conseillait plus léger : écoute tes sensations et coupe si ça tire.')}
     if(q.focus.includes('core')&&x.tpl.id==='core')sc+=10;if(q.focus.includes('mob')&&x.tpl.type==='mob')sc+=10;
     if(q.avoid.some(k=>f.includes(k)))sc-=200;
-    if(painConflict(x.tpl,q.pains)){sc-=150}
+    if(painConflict(x.tpl,q.pains))sc-=150;
     if(q.intensity==='easy'&&x.tpl.hard)sc-=35;if(q.intensity==='hard'&&x.tpl.hard)sc+=15;if(q.intensity==='hard'&&x.tpl.type==='mob')sc-=20;
-    return{...x,score:sc,why}}).sort((a,b)=>b.score-a.score);
+    return{...x,score:sc,why}}).sort((a,b)=>b.score-a.score)}
+/* Demande en plusieurs blocs : « 30/40 min de fractionné sur tapis puis 45 min de muscu » */
+function splitAsk(raw){let parts=String(raw).split(/\s*(?:,|\.)?\s*\b(?:et ensuite|ensuite|puis|suivie? d[eu]s?|et apr[eè]s(?: [cç]a)?|apr[eè]s [cç]a|enchaîn\w* (?:avec|par)|avant de|then)\b\s*|\s\+\s|;/i).filter(x=>x&&x.trim());
+  const out=[];parts.forEach(p=>{const n=(norm(p).match(/\d+\s*(?:\/|-|a|ou)?\s*\d*\s*(?:min|mn|minutes?|h\b|heures?)/g)||[]).length;
+    if(n>=2&&/\s(et|avec)\s/i.test(p))p.split(/\s(?:et|avec)\s/i).forEach(x=>x.trim()&&out.push(x));else out.push(p)});
+  return out.map(x=>x.trim()).filter(x=>norm(x).replace(/\b(seance du jour|seance|aujourd hui|ce soir|ce matin)\b/g,'').trim().length>2)}
+function answerAny(raw){const segs=splitAsk(raw);if(segs.length<2)return answerAsk(raw);
+  const g=parseAsk(raw);const qs=segs.map(x=>parseAsk(x)).filter(q=>q.focus.length);if(qs.length<2)return answerAsk(raw);
+  return answerCombo(raw,g,qs)}
+UI.combos={};
+function answerCombo(raw,g,qs){const date=g.date;const pool=S.sessions.filter(s=>s.status==='done'||s.date<date);const blocks=[];
+  qs.forEach((q,i)=>{q.date=date;q.lieu=q.lieu||g.lieu||(qs.some(z=>z.lieu==='salle')?'salle':null)||critDefaults().lieu;q.forme=q.forme||g.forme;q.pains=[...new Set([...q.pains,...g.pains])];q.avoid=[...new Set([...q.avoid,...g.avoid])];q.intensity=q.intensity||g.intensity;
+    const time=(q.multi?q.segTime:q.time)||Math.max(20,Math.round(((g.time||90)-blocks.reduce((a,b)=>a+b.dur,0))/(qs.length-i)));
+    const extra=blocks.map(b=>({...instantiate(b.tpl,date,{dur:b.dur,lieu:q.lieu}),status:'done',rpe:b.tpl.hard?8:6}));
+    let list=scoreAsk(q,rankTemplates(date,[...pool,...extra],time,{forme:q.forme||3,lieu:q.lieu}));
+    const prevHard=blocks.some(b=>b.tpl.hard||b.tpl.type==='run'),prevLegs=blocks.some(b=>b.tpl.legs);
+    list=list.filter(x=>!blocks.some(b=>b.tpl.id===x.tpl.id)).map(x=>{let sc=x.score;const why=[...x.why];
+      if(prevHard&&x.tpl.type==='muscu'&&(x.tpl.legs||x.tpl.sub==='bas')){sc-=60}
+      if(prevHard&&x.tpl.type==='muscu'&&!x.tpl.legs)why.unshift('Après la course, on épargne les jambes : haut du corps.');
+      if(prevLegs&&x.tpl.type==='run'){sc-=40}
+      return{...x,score:sc,why}}).sort((a,b)=>b.score-a.score);
+    const best=list[0];if(best)blocks.push({tpl:best.tpl,dur:best.dur,why:best.why,lieu:q.lieu,range:q.range,q})});
+  if(blocks.length<2)return answerAsk(raw);
+  const total=blocks.reduce((a,b)=>a+b.dur,0);const cid='c'+Date.now().toString(36);
+  UI.combos[cid]={date,blocks:blocks.map(b=>({tplId:b.tpl.id,dur:b.dur,lieu:b.lieu}))};
+  const first=blocks[0].tpl,second=blocks[1].tpl;let order='';
+  if(first.type==='run'&&first.hard&&second.type==='muscu')order='Le fractionné d\'abord, quand tu es frais : la qualité de course prime. Prends 5 min de récupération et de l\'eau avant la muscu.';
+  else if(first.type==='muscu'&&second.type==='run')order='La muscu d\'abord, puis la course : garde la course facile, tes muscles sont déjà fatigués.';
+  const understood=[g.forme?'forme : '+FORME[g.forme].toLowerCase():null,g.pains.length?'douleur : '+g.pains.join(', '):null,date!==today()?fmtDay(date):null].filter(Boolean);
+  const html=`<p class="small muted" style="margin:0">Compris : ${blocks.length} blocs enchaînés, ${total} min au total${understood.length?' · '+esc(understood.join(' · ')):''}.</p>
+   <div class="askpick combo"><div class="spread"><span class="eyebrow">Séance combinée</span><span class="tn small muted">${total} min</span></div>
+   ${blocks.map((b,i)=>`<div class="cblock t-${b.tpl.type}"><div class="spread"><span class="small"><b>Bloc ${i+1}</b> · ${typeChip(b.tpl.type)}</span><span class="tn small muted">${b.range&&b.dur!==+b.range.split(' ')[2]?b.dur+' min':b.range||b.dur+' min'}</span></div>
+     <b class="askname">${esc(b.tpl.name)}</b>
+     ${b.tpl.run?`<div class="small">${esc(runPlan(b.tpl.run,b.dur,b.lieu))}</div>`:b.tpl.cardio?`<div class="small">${esc(cardioPlan(b.tpl.cardio,b.dur))}</div>`:b.tpl.ex?`<div class="small muted">${exFor(b.tpl,b.dur).map(e=>esc(EX[e[0]].n)).join(' · ')}${exFor(b.tpl,b.dur)!==b.tpl.ex?' (version courte)':''}</div>`:''}
+     ${b.why.length?`<ul class="why small">${b.why.slice(0,2).map(w=>`<li>${w}</li>`).join('')}</ul>`:''}</div>`).join('')}
+   ${order?`<p class="small" style="margin:0">${order}</p>`:''}
+   <div class="row"><button class="btn sm primary" data-a="comboGo" data-c="${cid}" data-start="1">${date===today()?'Démarrer le bloc 1':'Planifier le '+fmtShort(date)}</button>${date===today()?`<button class="btn sm" data-a="comboGo" data-c="${cid}">Ajouter au calendrier</button>`:''}</div></div>`;
+  return{q:g,html}}
+function answerAsk(raw){const q=parseAsk(raw);const dflt=critDefaults();
+  const time=q.time||(+S.profile.avail[parseD(q.date).getDay()]||dflt.time||45);const lieu=q.lieu||dflt.lieu;const forme=q.forme||3;
+  let list=scoreAsk(q,rankTemplates(q.date,S.sessions.filter(s=>s.status==='done'||s.date<q.date),time,{forme,lieu}));
   const understood=[`${time>=60?Math.floor(time/60)+' h'+(time%60?' '+pad2(time%60):''):time+' min'}`,LIEUX[lieu].toLowerCase(),q.forme?'forme : '+FORME[forme].toLowerCase():null,
     q.date!==today()?fmtDay(q.date):null,q.focus.length?'envie : '+[...new Set(q.focus.map(k=>FOCUS_LABEL[k]))].join(', '):null,
     q.avoid.length?'sans '+[...new Set(q.avoid.map(k=>FOCUS_LABEL[k]))].join(', '):null,q.pains.length?'douleur : '+[...new Set(q.pains)].join(', '):null,
@@ -633,13 +677,13 @@ function answerAsk(raw){const q=parseAsk(raw);const dflt=critDefaults();
   return{q,html}}
 UI.chat=[];
 function askCard(){const msgs=UI.chat;
-  const chips=['45 min à la salle, envie de pecs','30 min chez moi, un peu fatigué','1 h dehors, je veux courir tranquille','Demain 1 h 30 à la salle, en forme, pas de jambes'];
+  const chips=['30/40 min de fractionné sur tapis puis 45 min de muscu','45 min à la salle, envie de pecs','30 min chez moi, un peu fatigué','1 h dehors, je veux courir tranquille','Demain 1 h 30 à la salle, en forme, pas de jambes'];
   return `<div class="card stack askcard"><div class="spread"><h2>Demande ta séance</h2>${msgs.length?'<button class="btn ghost sm" data-a="askClear">Effacer</button>':''}</div>
    ${msgs.length?`<div class="chat" id="chat">${msgs.map(m=>m.who==='me'?`<div class="msg me">${esc(m.text)}</div>`:`<div class="msg bot">${m.html}</div>`).join('')}</div>`:
      `<p class="small muted" style="margin:0">Écris comme tu parles : temps dispo, lieu, forme, envies, douleurs. Je te propose la séance adaptée.</p>
       <div class="chips">${chips.map(c=>`<button class="chipb" data-a="askChip" data-q="${esc(c)}">${esc(c)}</button>`).join('')}</div>`}
    <form class="askform" id="askform"><input type="text" id="askin" placeholder="Ex. 40 min à la salle, mal au genou, envie du haut du corps" autocomplete="off" enterkeyhint="send" aria-label="Ta demande"><button class="btn primary" type="submit">Envoyer</button></form></div>`}
-function sendAsk(text){text=String(text||'').trim();if(!text)return;const a=answerAsk(text);UI.chat.push({who:'me',text},{who:'bot',html:a.html});if(UI.chat.length>12)UI.chat=UI.chat.slice(-12);
+function sendAsk(text){text=String(text||'').trim();if(!text)return;const a=answerAny(text);UI.chat.push({who:'me',text},{who:'bot',html:a.html});if(UI.chat.length>12)UI.chat=UI.chat.slice(-12);
   render();const c=document.getElementById('chat');if(c){const last=c.lastElementChild;if(last)last.scrollIntoView({block:'start',behavior:'smooth'})}}
 
 /* ================= VIEW: TODAY ================= */
@@ -1343,6 +1387,8 @@ const A={
  askStart:b=>{const d=b.dataset.d,t=TPLBY[b.dataset.t],o={dur:+b.dataset.dur,lieu:b.dataset.l};if(d===today())openEditor(instantiate(t,d,o),true);else{makeReal();upsert(instantiate(t,d,o));toast('Planifiée le '+fmtShort(d));render()}},
  askPlan:b=>{makeReal();upsert(instantiate(TPLBY[b.dataset.t],b.dataset.d,{dur:+b.dataset.dur,lieu:b.dataset.l}));toast('Ajoutée au calendrier');render()},
  askChip:b=>sendAsk(b.dataset.q),
+ comboGo:b=>{const c=UI.combos[b.dataset.c];if(!c)return;makeReal();const made=c.blocks.map((x,i)=>{const s=instantiate(TPLBY[x.tplId],c.date,{dur:x.dur,lieu:x.lieu});s.title=`Bloc ${i+1} · ${s.title}`;upsert(s);return s});
+   if(b.dataset.start&&c.date===today()){render();openEditor(made[0],false)}else{toast(c.date===today()?'Séance combinée ajoutée à aujourd\'hui':'Séance combinée planifiée le '+fmtShort(c.date));render()}},
  askClear:()=>{UI.chat=[];render()},
  startReco:b=>{openEditor(instantiate(TPLBY[b.dataset.t],today(),{dur:+b.dataset.dur,lieu:UI.crit?.lieu}),true)},
  planReco:b=>{makeReal();upsert(instantiate(TPLBY[b.dataset.t],today(),{dur:+b.dataset.dur,lieu:UI.crit?.lieu}));toast('Ajoutée à aujourd\'hui');render()},

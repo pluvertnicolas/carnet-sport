@@ -1,6 +1,6 @@
 // Service worker : l'app reste utilisable hors connexion.
 // Pense à incrémenter VERSION à chaque déploiement pour forcer la mise à jour.
-const VERSION = 'carnet-sport-v4';
+const VERSION = 'carnet-sport-v5';
 const CORE = ['./', 'index.html', 'css/styles.css', 'js/app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
