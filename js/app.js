@@ -132,6 +132,8 @@ const EX={
   setup:'Pied arrière posé sur un banc, pied avant un grand pas devant.',steps:['Descends le genou arrière vers le sol.','Buste légèrement penché.','Pousse sur le talon avant.'],err:['Pied avant trop proche du banc.'],tip:'Reps par jambe.'},
  bird_dog:{n:'Bird dog',g:'tronc',m:'Lombaires, gainage',machine:'Poids du corps',unit:'reps',
   setup:'À quatre pattes, mains sous les épaules.',steps:['Tends le bras droit et la jambe gauche.','Tiens 2 secondes sans bouger le bassin.','Alterne.'],err:['Dos qui se creuse.'],tip:'Lent et stable.'},
+ rocking_chair:{n:'Rocking chair',g:'tronc',m:'Bas des abdominaux, grands droits',machine:'Tapis',unit:'reps',rest:45,
+  setup:'Allongé sur le dos, bras le long du corps, paumes au sol. Cuisses à la verticale, genoux pliés.',steps:['Expire et ramène les genoux vers la poitrine en enroulant le bassin.','Décolle les fesses du sol sans élan.','Redescends lentement jusqu\'à frôler le sol avec les pieds.','Enchaîne sans poser les jambes.'],err:['Élan pris avec les jambes au lieu du bassin.','Bas du dos creusé en redescendant.','Mains qui poussent fort dans le sol.'],tip:'Une montée de jambes = une répétition. Séries de 10, 45 s de repos.'},
  dead_bug:{n:'Dead bug',g:'tronc',m:'Abdominaux profonds',machine:'Poids du corps',unit:'reps',
   setup:'Sur le dos, bras vers le plafond, genoux à 90°.',steps:['Plaque le bas du dos au sol.','Allonge bras et jambe opposés.','Reviens et alterne.'],err:['Bas du dos qui décolle.'],tip:'Expire en allongeant.'},
  pushup:{n:'Pompes',g:'tronc',m:'Pectoraux, triceps, gainage',machine:'Poids du corps',unit:'reps',
@@ -220,14 +222,14 @@ EX.db_curl.step=2;
 const EXG={pecs:['chest_press','bench_press','db_bench','incline_db_press','pec_deck','cable_cross','pushup'],epaules:['shoulder_press','lateral_raise','face_pull'],
  dos:['seated_row','lat_pulldown','db_row','cable_row','pullover'],bras:['machine_curl','ez_curl','db_curl','hammer_curl','cable_curl','triceps_pushdown','triceps_bar','dip_machine','assisted_dip'],
  jambes:['leg_press','leg_curl','leg_extension','hip_thrust','bulgarian_split','goblet_squat','walking_lunge','rdl','calf_raise','eccentric_calf','abductor','air_squat','jump_squat','jump_lunge'],
- abdos:['plank','side_plank','plank_hip_dip','ab_crunch','crunch','dead_bug','in_out','mountain_climber','bird_dog','glute_bridge_single','clamshell'],
+ abdos:['plank','side_plank','plank_hip_dip','ab_crunch','crunch','rocking_chair','dead_bug','in_out','mountain_climber','bird_dog','glute_bridge_single','clamshell'],
  mob:['hip_flexor','hip_9090','thoracic_rot','ankle_mob']};
 Object.entries(EXG).forEach(([g,l])=>l.forEach(k=>{if(EX[k])EX[k].g=g}));
 const PH={chest_press:'leverage-chest-press',bench_press:'barbell-bench-press-medium-grip',db_bench:'dumbbell-bench-press',incline_db_press:'incline-dumbbell-press',pec_deck:'butterfly',cable_cross:'cable-crossover',pushup:'pushups',
  shoulder_press:'leverage-shoulder-press',lateral_raise:'side-lateral-raise',face_pull:'face-pull',seated_row:'leverage-iso-row',lat_pulldown:'wide-grip-lat-pulldown',db_row:'one-arm-dumbbell-row',cable_row:'seated-cable-rows',pullover:'bent-arm-dumbbell-pullover',
  machine_curl:'machine-bicep-curl',ez_curl:'ez-bar-curl',db_curl:'dumbbell-alternate-bicep-curl',hammer_curl:'alternate-hammer-curl',cable_curl:'standing-biceps-cable-curl',triceps_pushdown:'triceps-pushdown-rope-attachment',triceps_bar:'triceps-pushdown',dip_machine:'dip-machine',
  leg_press:'leg-press',leg_curl:'seated-leg-curl',leg_extension:'leg-extensions',hip_thrust:'barbell-hip-thrust',bulgarian_split:'split-squats',goblet_squat:'goblet-squat',walking_lunge:'dumbbell-lunges',rdl:'stiff-legged-dumbbell-deadlift',calf_raise:'standing-calf-raises',eccentric_calf:'rocking-standing-calf-raise',abductor:'thigh-abductor',air_squat:'bodyweight-squat',jump_squat:'freehand-jump-squat',jump_lunge:'split-jump',
- plank:'plank',side_plank:'side-bridge',ab_crunch:'ab-crunch-machine',crunch:'crunches',dead_bug:'dead-bug',in_out:'seated-leg-tucks',mountain_climber:'mountain-climbers',glute_bridge_single:'single-leg-glute-bridge',hip_flexor:'kneeling-hip-flexor'};
+ plank:'plank',side_plank:'side-bridge',ab_crunch:'ab-crunch-machine',crunch:'crunches',rocking_chair:'reverse-crunch',dead_bug:'dead-bug',in_out:'seated-leg-tucks',mountain_climber:'mountain-climbers',glute_bridge_single:'single-leg-glute-bridge',hip_flexor:'kneeling-hip-flexor'};
 const GROUPS={pecs:'Pectoraux',epaules:'Épaules',dos:'Dos',bras:'Bras',jambes:'Jambes',abdos:'Abdos & gainage',mob:'Mobilité'};
 
 // template exercise: [id, sets, lo, hi]
@@ -237,9 +239,9 @@ const TPL=[
  {id:'push_b',type:'muscu',key:'muscu',sub:'push',name:'Pecs / épaules / triceps B',dur:65,hard:false,legs:false,warm:true,desc:'Version barre et poulies, avec le face pull pour l\'arrière d\'épaule.',
   ex:[['bench_press',4,8,12],['cable_cross',3,12,15],['shoulder_press',4,8,12],['face_pull',3,12,15],['dip_machine',3,10,12],['triceps_bar',3,10,12],['ab_crunch',3,12,15]]},
  {id:'pull_a',type:'muscu',key:'muscu',sub:'pull',name:'Dos / biceps A',dur:60,hard:false,legs:false,warm:true,desc:'Tirages machine puis travail unilatéral et biceps.',
-  ex:[['seated_row',4,8,12],['lat_pulldown',4,8,12],['db_row',3,10,12],['db_curl',3,10,12],['hammer_curl',3,10,12]]},
+  ex:[['seated_row',4,8,12],['lat_pulldown',4,8,12],['db_row',3,10,12],['db_curl',3,10,12],['hammer_curl',3,10,12],['rocking_chair',3,10,10]]},
  {id:'pull_b',type:'muscu',key:'muscu',sub:'pull',name:'Dos / biceps B',dur:60,hard:false,legs:false,warm:true,desc:'Grand dorsal en priorité, curls machine et barre EZ.',
-  ex:[['lat_pulldown',4,8,12],['cable_row',3,10,12],['pullover',3,10,12],['machine_curl',3,10,12],['ez_curl',3,10,12],['face_pull',3,12,15]]},
+  ex:[['lat_pulldown',4,8,12],['cable_row',3,10,12],['pullover',3,10,12],['machine_curl',3,10,12],['ez_curl',3,10,12],['face_pull',3,12,15],['rocking_chair',3,10,10]]},
  {id:'legs',type:'muscu',key:'muscu',sub:'bas',name:'Jambes & gainage',dur:55,hard:true,legs:true,warm:true,desc:'La pièce manquante de ta routine : protège genoux et chevilles pour le foot, le squash et la course.',
   ex:[['leg_press',4,8,12],['leg_curl',3,10,12],['bulgarian_split',3,8,10],['hip_thrust',3,10,12],['calf_raise',3,12,15],['side_plank',2,30,45]]},
  {id:'home_circuit',type:'renfo',key:'renfo',sub:'full',name:'Full body maison · circuit × 4',dur:35,hard:true,legs:true,loc:['maison','exterieur'],circuit:4,desc:'Ton circuit maison : 4 tours, 2 min de repos entre les tours.',
@@ -247,7 +249,7 @@ const TPL=[
  {id:'renfo_run',type:'renfo',key:'renfo',name:'Renfo du coureur',dur:30,hard:false,legs:true,desc:'Prévention des blessures : fessiers, mollets, gainage.',
   ex:[['glute_bridge_single',3,10,12],['clamshell',3,15,20],['eccentric_calf',3,10,12],['bulgarian_split',3,8,10],['side_plank',3,30,45],['bird_dog',2,10,12]]},
  {id:'core',type:'renfo',key:'renfo',name:'Gainage 20 min',dur:20,hard:false,legs:false,desc:'Sangle abdominale et lombaires.',
-  ex:[['plank',3,40,60],['side_plank',3,30,45],['dead_bug',3,10,12],['bird_dog',3,10,12]]},
+  ex:[['plank',3,40,60],['rocking_chair',3,10,10],['side_plank',3,30,45],['dead_bug',3,10,12],['bird_dog',3,10,12]]},
  {id:'circuit',type:'renfo',key:'renfo',name:'Circuit cardio-renfo',dur:25,hard:true,legs:false,desc:'4 tours enchaînés, 1 min 30 de repos entre les tours. Dépense élevée.',
   ex:[['jump_squat',4,12,15],['pushup',4,10,15],['mountain_climber',4,30,40],['walking_lunge',4,10,12],['plank',4,30,40]]},
  {id:'ef',type:'run',key:'run_e',name:'Endurance fondamentale',dur:40,hard:false,legs:false,desc:'La base de 80 % de ton volume de course.',run:'ef'},
@@ -550,7 +552,7 @@ const FOCUS=[
  ['run',/\b(cour(ir|se|s)|footing|running|jogging|trail|foot?ing|tapis)\b/],
  ['velo',/\b(velo|spinning|bike|biking)\b/],
  ['cardio',/\b(cardio|elliptique|rameur|escaliers?|marche|transpirer|bruler|endurance)\b/],
- ['core',/\b(abdos?|gainage|sangle|abdominaux|planche|core)\b/],
+ ['core',/\b(abdos?|gainage|sangle|abdominaux|planche|core|rocking)\b/],
  ['mob',/\b(etirements?|mobilite|stretching|souplesse|yoga|recup\w*|relach\w*)\b/],
  ['circuit',/\b(circuit|hiit|tabata|full ?body|crossfit|bootcamp)\b/],
  ['muscu',/\b(muscu\w*|renfo\w*|haut du corps|bras|force|poids|machines?)\b/]];
@@ -1284,7 +1286,7 @@ function setRow(x,e,ei,si,st,cur){const u=e.unit;const rl=u==='sec'?'secondes':'
 let wakeLock=null;
 async function keepAwake(on){try{if(on&&!wakeLock&&'wakeLock' in navigator&&document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){wakeLock=null}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ED&&ED.exercises)keepAwake(true)});
-function restFor(exId){const e=EX[exId];const base=+(S.profile.rest||90);return e&&e.unit==='kg'?base:Math.min(45,base)}
+function restFor(exId){const e=EX[exId];const base=+(S.profile.rest||90);if(e&&e.rest)return e.rest;return e&&e.unit==='kg'?base:Math.min(45,base)}
 let audioCtx=null;
 function beep(){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.25,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.5);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.5)}catch(e){}}
 function timerBar(){if(!timerEnd)return '';return `<div class="restbar" id="restbar"><div><div class="eyebrow">Repos</div><span class="timer tn" id="timer">${fmtSec(Math.max(0,Math.round((timerEnd-Date.now())/1000)))}</span></div><div class="row"><button class="btn sm" data-a="timerAdd" data-n="-15">−15 s</button><button class="btn sm" data-a="timerAdd" data-n="15">+15 s</button><button class="btn sm primary" data-a="timerStop">Passer</button></div></div>`}

@@ -13,7 +13,7 @@ App web personnelle d'entraînement pour Nicolas (Bordeaux). Vanilla JS, aucune 
 
 - `IN_CLAUDE` : vrai si la page tourne dans un artefact Claude (`window.claude.use` existe). Dans ce cas : base `db` partagée et connecteur Strava via `claude.use('mcp')`. Sinon : localStorage seulement. Tout code qui dépend de Claude doit tester `IN_CLAUDE` ou gérer un retour `null`.
 - Données de référence :
-  - `EX` : exercices (nom, muscles, réglage machine, étapes, erreurs, unité `kg|reps|sec`, `step` de charge, `perHand` pour les haltères, `assist` pour les machines d'assistance). `EX[id].g` : groupe musculaire (`EXG`).
+  - `EX` : exercices (nom, muscles, réglage machine, étapes, erreurs, unité `kg|reps|sec`, `step` de charge, `perHand` pour les haltères, `assist` pour les machines d'assistance, `rest` pour un repos fixe en secondes qui prime sur le réglage). `EX[id].g` : groupe musculaire (`EXG`).
   - `PH` : photo associée à un exercice (`img/<slug>-0.jpg` départ, `-1.jpg` arrivée).
   - `FIG` : schémas animés en SVG (cinématique simple) pour les exercices sans photo.
   - `TPL` : modèles de séance (`push_a`, `push_b`, `pull_a`, `pull_b`, `legs`, `home_circuit`, running, cardio, renfo, mobilité). `ex: [[exId, séries, repsMin, repsMax]]`.
